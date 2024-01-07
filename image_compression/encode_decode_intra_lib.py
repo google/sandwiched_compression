@@ -163,7 +163,6 @@ class EncodeDecodeIntra(tf.keras.Model):
     self._init_jpeg_layer(convert_to_yuv, downsample_chroma)
 
     # Workaround thread-unsafe PIL library by calling init in main thread.
-    # See https://yaqs.corp.google.com/eng/q/6292200559345664
     Image.init()
 
   def _positive_qstep(self):

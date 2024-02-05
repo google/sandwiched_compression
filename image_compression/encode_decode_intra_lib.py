@@ -23,8 +23,10 @@ import tensorflow as tf
 def _encode_decode_with_jpeg(
     input_images: np.ndarray,
     qstep: np.float32,
-    one_channel_at_a_time: bool = False) -> Tuple[np.ndarray, np.ndarray]:
-  """Compress-decompress with actual jpeg with fixed qstep and 444.
+    one_channel_at_a_time: bool = False,
+    use_420: bool = False,
+) -> Tuple[np.ndarray, np.ndarray]:
+  """Compress-decompress with actual jpeg with fixed qstep.
 
   Args:
     input_images: Array of shape [b, n, m, c] where b is batch size, n x m is
@@ -32,6 +34,7 @@ def _encode_decode_with_jpeg(
     qstep: float that determines the step-size of the scalar quantizer.
     one_channel_at_a_time: True if each channel should be encoded independently
       as a grayscale image.
+    use_420: True when desired subsmapling is 4:2:0. False when 4:4:4.
 
   Returns:
     decoded: Array of same size as input_images containing the
@@ -57,7 +60,8 @@ def _encode_decode_with_jpeg(
         quality=100,
         optimize=True,
         qtables=[qtable, qtable, qtable],
-        subsampling='4:4:4')
+        subsampling='4:2:0' if use_420 else '4:4:4',
+    )
     decoded = np.array(Image.open(buf))
     rate = np.array(8 * len(buf.getbuffer()))
     return decoded, rate
@@ -160,6 +164,12 @@ class EncodeDecodeIntra(tf.keras.Model):
     self.use_jpeg_rate_model = add_variable_conditionally(
         'use_jpeg_rate_model', use_jpeg_rate_model
     )
+    self.run_jpeg_one_channel_at_a_time = add_variable_conditionally(
+        'run_jpeg_one_channel_at_a_time', True
+    )
+    self.downsample_chroma = add_variable_conditionally(
+        'downsample_chroma', downsample_chroma
+    )
     self._init_jpeg_layer(convert_to_yuv, downsample_chroma)
 
     # Workaround thread-unsafe PIL library by calling init in main thread.
@@ -233,14 +243,16 @@ class EncodeDecodeIntra(tf.keras.Model):
 
     def encode_decode_inputs_with_jpeg() -> Tuple[tf.Tensor, tf.Tensor]:
       """Encodes then decodes the three_channel_inputs using actual jpeg."""
-      run_jpeg_one_channel_at_a_time = tf.constant(True, dtype=bool, shape=())
       jpeg_decoded, jpeg_rate = tf.numpy_function(
           _encode_decode_with_jpeg,
           inp=[
               three_channel_inputs,
-              self._positive_qstep(), run_jpeg_one_channel_at_a_time
+              self._positive_qstep(),
+              self.run_jpeg_one_channel_at_a_time,
+              self.downsample_chroma,
           ],
-          Tout=[tf.float32, tf.float32])
+          Tout=[tf.float32, tf.float32],
+      )
       jpeg_decoded.set_shape(three_channel_inputs.shape)
       jpeg_rate.set_shape(three_channel_inputs.shape[0])
       return jpeg_decoded, jpeg_rate

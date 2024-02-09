@@ -57,30 +57,12 @@ media.show_images(compressed_images[0:3] / 255)
 ![Output](images/image_proxy_output.png)
 
 ## References
-[Image Compression](https://research.google/pubs/sandwiched-image-compression-wrapping-neural-networks-around-a-standard-codec/)
+[Image and Video Compression](https://arxiv.org/abs/2402.05887)
 ```bibtex
-@INPROCEEDINGS{9506256,
-  author={Guleryuz, Onur G. and Chou, Philip A. and Hoppe, Hugues and Tang, Danhang and Du, Ruofei and Davidson, Philip and Fanello, Sean},
-  booktitle={2021 IEEE International Conference on Image Processing (ICIP)}, 
-  title={Sandwiched Image Compression: Wrapping Neural Networks Around A Standard Codec}, 
-  year={2021},
-  volume={},
-  number={},
-  pages={3757-3761},
-  doi={10.1109/ICIP42928.2021.9506256}}
+@article{guleryuz2024sandwiched,
+  title={Sandwiched Compression: Repurposing Standard Codecs with Neural Network Wrappers},
+  author={Onur G. Guleryuz and Philip A. Chou and Berivan Isik and Hugues Hoppe and Danhang Tang and Ruofei Du and Jonathan Taylor and Philip Davidson and Sean Fanello},
+  journal={arXiv preprint arXiv:2402.05887},
+  year={2024}
+}
 ```
-
-[Video Compression](https://arxiv.org/abs/2303.11473)
-```bibtex
-@INPROCEEDINGS{10222313,
-  author={Isik, Berivan and Guleryuz, Onur G. and Tang, Danhang and Taylor, Jonathan and Chou, Philip A.},
-  booktitle={2023 IEEE International Conference on Image Processing (ICIP)}, 
-  title={Sandwiched Video Compression: Efficiently Extending the Reach of Standard Codecs with Neural Wrappers}, 
-  year={2023},
-  volume={},
-  number={},
-  pages={2055-2059},
-  doi={10.1109/ICIP49359.2023.10222313}}
-```
-
-

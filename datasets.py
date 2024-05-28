@@ -5,7 +5,8 @@ import tensorflow_datasets as tfds
 
 
 ################################################################################
-# Routines for loading the basic pet and clic datasets. ########################
+# Routines for loading basic datasets. See  https://www.tensorflow.org/datasets 
+# for options.
 ################################################################################
 
 def load_tfds_image_dataset(batch_size: int,

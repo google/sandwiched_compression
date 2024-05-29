@@ -24,37 +24,22 @@ The code uses a differentiable codec proxy for the standard codec. Pre and post-
 
 In image/video compression scenarios a nice property of this work is that the networks need to generate images/video, i.e., visual data, which the standard codecs transport. We can hence check the generated images/video (termed bottlenecks) to get an idea of what the networks are trying to accomplish.
 
-The image codec proxy is included in this release.
+The full sandwich image compression model is included in this release. (Video compression model is coming soon.)
 
 ## Manifest
+* distortion/distortion_fns.py: Distortion functions to use in distortion-rate optimization.
 * image_compression/encode_decode_intra_lib.py: Includes class EncodeDecodeIntra which contains the differentiable image proxy.
 * image_compression/jpeg_proxy.py: Includes class JpegProxy which supports EncodeDecodeIntra.
+* pre_post_models/unet.py: Simple unet model for pre-post-processors.
+* utilities/serialization.py: Checkpoint management routines.
+* compress_intra_model.py: Sandwich model for image compression.
+* datasets.py: Basic loader for tensorflow datasets.
+* image_codec_proxy.ipynb: Colab for basic image codec proxy usage.
+* sandwich_image_compression_grayscale_codec.ipynb: Colab for the grayscale codec scenario with example training and results.
+* sandwich_image_compression_lowres_codec.ipynb: Colab for the lowres codec scenario with example training and results.
 
 ## Usage
-```python
-def differentiable_round(x: tf.Tensor) -> tf.Tensor:
-  """Differentiable rounding."""
-  return x + tf.stop_gradient(tf.round(x) - x)
-
-
-intra_compression_layer = encode_decode_intra_lib.EncodeDecodeIntra(
-    rounding_fn=differentiable_round,
-    qstep_init=30.0,
-    train_qstep=False, # Set to True when training a sandwich.
-    convert_to_yuv=True, # Set to False when training a sandwich.
-)
-
-# Any batch of 3-color, 8-bit (0-255) images in float.
-images = tf.convert_to_tensor(test_images[0:16, ...])
-
-compressed_images, rate = intra_compression_layer(images)
-print(images.dtype, images.shape, compressed_images.shape, rate.shape)
-
-# mediapy: https://github.com/google/mediapy
-media.show_images(compressed_images[0:3] / 255)
-```
-
-![Output](images/image_proxy_output.png)
+Please see sandwich_image_compression_lowres_codec.ipynb and sandwich_image_compression_grayscale_codec.ipynb for two scneraios discussed in the paper. Beyond the included software you will need tensorflow-datasets (with the 'clic' dataset downloaded) and mediapy. Please see the colabs for instructions.
 
 ## References
 [Image and Video Compression](https://arxiv.org/abs/2402.05887)

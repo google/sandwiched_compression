@@ -15,7 +15,7 @@
 import io
 from typing import Callable, Dict, List, Optional, Tuple
 
-import jpeg_proxy
+from image_compression import jpeg_proxy
 import numpy as np
 from PIL import Image
 import tensorflow as tf

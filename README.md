@@ -24,6 +24,7 @@ The code uses a differentiable codec proxy for the standard codec. Pre and post-
 
 In image/video compression scenarios a nice property of this work is that the networks need to generate images/video, i.e., visual data, which the standard codecs transport. We can hence check the generated images/video (termed bottlenecks) to get an idea of what the networks are trying to accomplish.
 
+## Release
 The full sandwich image compression model is included in this release. (Video compression model is coming soon.)
 
 ## Manifest
@@ -39,7 +40,7 @@ The full sandwich image compression model is included in this release. (Video co
 * sandwich_image_compression_lowres_codec.ipynb: Colab for the lowres codec scenario with example training and results.
 
 ## Usage
-Please see sandwich_image_compression_lowres_codec.ipynb and sandwich_image_compression_grayscale_codec.ipynb for two scneraios discussed in the paper. Beyond the included software you will need tensorflow-datasets (with the 'clic' dataset downloaded) and mediapy. Please see the colabs for instructions.
+Please see sandwich_image_compression_lowres_codec.ipynb and sandwich_image_compression_grayscale_codec.ipynb for two scenarios discussed in the paper. Beyond the included software you will need tensorflow-datasets (with the 'clic' dataset downloaded) and mediapy. Please see the colabs for instructions.
 
 ## References
 [Image and Video Compression](https://arxiv.org/abs/2402.05887)

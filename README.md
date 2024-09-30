@@ -2,6 +2,8 @@
 
 Copyright 2024 Google LLC
 
+[Google Illuminate Overview Podcast (3 min)](https://illuminate.google.com/library?pli=1&play=fI4GBf_EM3V41)
+
 ### Color over Grayscale Codec
 ![Grayscale Codec](images/400_video.gif)
 ### Hires over Lowres Codec

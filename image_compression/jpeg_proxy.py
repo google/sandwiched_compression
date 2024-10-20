@@ -19,7 +19,32 @@ import numpy as np
 import tensorflow as tf
 
 
-class JpegProxy(object):
+def pad_spatially_to_multiple_of_bsize(
+    inputs: tf.Tensor, bsize: int, mode: str = 'SYMMETRIC'
+) -> tf.Tensor:
+  """Pads a tensor spatially to a multiple of bsize.
+
+  Args:
+    inputs: Tensor of size [b, n, m, c] where b is batch size, [n, m] is the
+      image shape, and c is the number of channels.
+    bsize: Desired pad multiple.
+    mode: Padding mode.
+
+  Returns:
+    outputs: Tensor of size [b, n', m', c] where n' (n' >= n) and m' (m' >= m)
+    are multiples of bsize.
+  """
+  height, width = inputs.shape[1:3]
+  pad_height = ((height - 1) // bsize + 1) * bsize - height
+  pad_width = ((width - 1) // bsize + 1) * bsize - width
+  if pad_height or pad_width:
+    return tf.pad(
+        inputs, [[0, 0], [0, pad_height], [0, pad_width], [0, 0]], mode
+    )
+  return inputs
+
+
+class JpegProxy:
   """Differentiable JPEG-like layer. Simplified for sandwich use."""
 
   def __init__(
@@ -28,8 +53,9 @@ class JpegProxy(object):
       luma_quantization_table: tf.Tensor,
       chroma_quantization_table: tf.Tensor,
       convert_to_yuv: bool,
-      clip_to_0_255: bool,
+      clip_to_image_max: bool,
       dct_size: int = 8,
+      upsample_method: tf.image.ResizeMethod = tf.image.ResizeMethod.LANCZOS3,
   ):  # pytype: disable=annotation-type-mismatch
     """Constructor.
 
@@ -39,17 +65,21 @@ class JpegProxy(object):
 
     Args:
       downsample_chroma: Whether to downsample chroma channels. Downsampling is
-        bilinear, upsampling is nearest neighbor.
+        bilinear, upsampling is as set by upsample_method.
       luma_quantization_table: [dct_size, dct_size] (or [dct_size**2]) tensor
         for Y channel (luma) quantization.
       chroma_quantization_table: [dct_size, dct_size] (or [dct_size**2]) tensor
         for U and V channels (chroma) quantization.
       convert_to_yuv: When True rgb-to-yuv and yuv-to-rgb color conversions are
         enabled. When false the conversions are skipped.
-      clip_to_0_255: True if final output should be clipped to [0, 255].
+      clip_to_image_max: True if final output should be clipped to [0,
+        image_max].
       dct_size: Size of the core 1D DCT transform.
+      upsample_method: Method to use in upsampling chroma after compression when
+        downsample_chroma is True. Downsampling is always bilinear.
     """
     self.downsample_chroma = downsample_chroma
+    self.upsample_method = upsample_method
     self.luma_quantization_table = tf.reshape(
         tf.convert_to_tensor(luma_quantization_table), [-1]
     )
@@ -57,7 +87,7 @@ class JpegProxy(object):
         tf.convert_to_tensor(chroma_quantization_table), [-1]
     )
     self.convert_to_yuv = convert_to_yuv
-    self.clip_to_0_255 = clip_to_0_255
+    self.clip_to_image_max = clip_to_image_max
 
     # Color conversion matrices (https://en.wikipedia.org/wiki/YCbCr).
     self.rgb_from_yuv_matrix = [
@@ -171,6 +201,7 @@ class JpegProxy(object):
       self,
       image: tf.Tensor,
       rounding_fn: Callable[[tf.Tensor], tf.Tensor] = tf.round,
+      image_max: float = 255.0,
   ) -> Tuple[tf.Tensor, Dict[str, tf.Tensor]]:
     """Compresses and decompresses input an image similar to JPEG.
 
@@ -183,6 +214,7 @@ class JpegProxy(object):
         This is the preferred mode when the qstep(s) used during quantization
         are optimized and maintained elsewhere. See EncodeDecodeIntra in
         encode_decode_intra_lib.py.
+      image_max: Maximum possible value of the image.
 
     Returns:
       Compressed image of the same size and type as input.
@@ -202,12 +234,10 @@ class JpegProxy(object):
     pad_multiple = (
         2 * self.dct_size if self.downsample_chroma else self.dct_size
     )
-    pad_height = ((height - 1) // pad_multiple + 1) * pad_multiple - height
-    pad_width = ((width - 1) // pad_multiple + 1) * pad_multiple - width
-    if pad_height or pad_width:
-      image = tf.pad(
-          image, [[0, 0], [0, pad_height], [0, pad_width], [0, 0]], 'SYMMETRIC'
-      )
+    image = pad_spatially_to_multiple_of_bsize(
+        image, pad_multiple, mode='SYMMETRIC'
+    )
+    padded_height, padded_width = image.shape[1:3]
 
     # Encode-Decode
     if self.convert_to_yuv:
@@ -215,8 +245,6 @@ class JpegProxy(object):
 
     downsample = [False, self.downsample_chroma, self.downsample_chroma]
     dct_keys = ['y', 'u', 'v']
-    padded_height = height + pad_height
-    padded_width = width + pad_width
     decoded_image = []
 
     quantized_dct_coeffs = {}
@@ -226,6 +254,7 @@ class JpegProxy(object):
             image[..., ch : ch + 1],
             [padded_height // 2, padded_width // 2],
             tf.image.ResizeMethod.BILINEAR,  # Should result in the mid pixel.
+            antialias=True,
         )
       else:
         channel = image[..., ch : ch + 1]
@@ -253,7 +282,8 @@ class JpegProxy(object):
         channel = tf.image.resize(
             channel,
             [padded_height, padded_width],
-            tf.image.ResizeMethod.NEAREST_NEIGHBOR,
+            method=self.upsample_method,
+            antialias=True,
         )
       decoded_image = (
           channel if ch == 0 else tf.concat([decoded_image, channel], axis=-1)
@@ -265,6 +295,6 @@ class JpegProxy(object):
 
     # Back to original size.
     decoded_image = decoded_image[:, 0:height, 0:width, :]
-    if self.clip_to_0_255:
-      decoded_image = tf.clip_by_value(decoded_image, 0.0, 255.0)
+    if self.clip_to_image_max:
+      decoded_image = tf.clip_by_value(decoded_image, 0.0, image_max)
     return decoded_image, quantized_dct_coeffs

@@ -82,6 +82,75 @@ def _encode_decode_with_jpeg(
   return decoded.astype(np.float32), rate.astype(np.float32)
 
 
+def convert_420_to_444(
+    inputs: tf.Tensor,
+    method: tf.image.ResizeMethod = tf.image.ResizeMethod.LANCZOS3,
+) -> tf.Tensor:
+  """Converts a YUV420 tensor to YUV444.
+
+  Args:
+    inputs: Tensor of size [b, n, m, c] or [b, f, n, m, c] where b is batch
+      size, f is the number of frames in a video clip, [n, m] is the image/frame
+      shape, and c is the number of channels. When input rank is 4 inputs is a
+      batch of images. When input rank is 5 inputs is a batch of video clips.
+    method: Desired chroma resizing method. Using bilinear will result in the
+      center pixel.
+
+  Returns:
+    outputs: Tensor of the same size as inputs where UV channels have been
+    upsampled.
+  """
+  outputs_chroma = tf.reshape(inputs, [-1, *inputs.shape[-3:]])[..., 1:]
+  outputs_chroma = outputs_chroma[
+      :, 0 : outputs_chroma.shape[1] // 2, 0 : outputs_chroma.shape[2] // 2, :
+  ]
+  new_size = [outputs_chroma.shape[1] * 2, outputs_chroma.shape[2] * 2]
+  # Upsample chroma.
+  outputs_chroma = tf.image.resize(
+      outputs_chroma, new_size, method=method, antialias=True
+  )
+  num_chroma_channels = inputs.shape[-1] - 1
+  outputs_chroma = tf.reshape(
+      outputs_chroma, [*inputs.shape[:-1], num_chroma_channels]
+  )
+  return tf.concat([inputs[..., 0:1], outputs_chroma], axis=-1)
+
+
+def convert_444_to_420(
+    inputs: tf.Tensor,
+    method: tf.image.ResizeMethod = tf.image.ResizeMethod.BILINEAR,
+) -> tf.Tensor:
+  """Converts a 444 tensor to 420 by downsampling the chroma channels.
+
+  Args:
+    inputs: Tensor of size [b, n, m, c] or [b, f, n, m, c] where b is batch
+      size, f is the number of frames in a video clip, [n, m] is the image/frame
+      shape, and c is the number of channels. When input rank is 4 inputs is a
+      batch of images. When input rank is 5 inputs is a batch of video clips.
+    method: Desired chroma resizing method. Using bilinear will result in the
+      center pixel.
+
+  Returns:
+    outputs: Tensor of the same size as inputs where chroma channels have been
+    downsampled.
+  """
+  outputs_chroma = tf.reshape(inputs, [-1, *inputs.shape[-3:]])[..., 1:]
+  new_size = [outputs_chroma.shape[1] // 2, outputs_chroma.shape[2] // 2]
+  # Downsample chroma.
+  outputs_chroma = tf.image.resize(
+      outputs_chroma, new_size, method=method, antialias=True
+  )
+  num_chroma_channels = inputs.shape[-1] - 1
+  outputs_chroma = tf.reshape(
+      tf.pad(  # Zero-pad so that a single tensor is returned.
+          outputs_chroma,
+          [[0, 0], [0, new_size[0]], [0, new_size[1]], [0, 0]],
+      ),
+      [*inputs.shape[:-1], num_chroma_channels],
+  )
+  return tf.concat([inputs[..., 0:1], outputs_chroma], axis=-1)
+
+
 class EncodeDecodeIntra(tf.keras.Model):
   """A class with methods for basic intra compression emulation."""
 
@@ -92,7 +161,7 @@ class EncodeDecodeIntra(tf.keras.Model):
       qstep_init: float = 1.0,
       train_qstep: bool = True,
       min_qstep: float = 0.0,
-      jpeg_clip_to_0_255: bool = True,
+      jpeg_clip_to_image_max: bool = True,
       convert_to_yuv: bool = False,
       downsample_chroma: bool = False,
   ):
@@ -111,8 +180,8 @@ class EncodeDecodeIntra(tf.keras.Model):
         INTRA and INTER.
       min_qstep: Minimum value which qstep should be greater than. Set to 1 to
         reflect for some practical codecs that cannot go below integer values.
-      jpeg_clip_to_0_255: True if jpeg proxy should clip the final output to [0,
-        255]. Set to False when handling INTER frames.
+      jpeg_clip_to_image_max: True if jpeg proxy should clip the final output to
+        [0, image_max]. Set to False when handling INTER frames.
       convert_to_yuv: True if color conversion should be applied during
         compression.
       downsample_chroma: Whether chroma planes should be downsampled during
@@ -136,7 +205,7 @@ class EncodeDecodeIntra(tf.keras.Model):
         name='min_qstep',
         dtype=tf.float32)
 
-    self.clip_to_0_255 = jpeg_clip_to_0_255
+    self.clip_to_image_max = jpeg_clip_to_image_max
 
     def _quantizer_fn(x: tf.Tensor) -> tf.Tensor:
       """Implements quantize-dequantize with the trainable qstep."""
@@ -164,19 +233,42 @@ class EncodeDecodeIntra(tf.keras.Model):
     self.use_jpeg_rate_model = add_variable_conditionally(
         'use_jpeg_rate_model', use_jpeg_rate_model
     )
-    self.run_jpeg_one_channel_at_a_time = add_variable_conditionally(
-        'run_jpeg_one_channel_at_a_time', True
-    )
-    self.downsample_chroma = add_variable_conditionally(
-        'downsample_chroma', downsample_chroma
-    )
+
     self._init_jpeg_layer(convert_to_yuv, downsample_chroma)
+
+    # Actual jpeg is run on processed data for rate estimates. All color
+    # conversion and chroma downsampling is done during differentiable
+    # processing. We hence need actual jpeg to encode single channel data
+    # without any downsampling unless convert_to_yuv is True. convert_to_yuv is
+    # only useful in cases where the sandwiched codec is hard-coded to convert
+    # to YUV.
+    self.run_jpeg_one_channel_at_a_time = add_variable_conditionally(
+        'run_jpeg_one_channel_at_a_time', False if convert_to_yuv else True
+    )
+    self.run_jpeg_with_downsampled_chroma = add_variable_conditionally(
+        'run_jpeg_with_downsampled_chroma', downsample_chroma
+    )
+
+    logging.info(
+        'EncodeDecodeIntra configured with %s',
+        'jpeg-rate' if use_jpeg_rate_model else 'gaussian-rate',
+    )
+
+    logging.info(
+        'EncodeDecodeIntra running %s',
+        '420' if downsample_chroma else '444',
+    )
+
+    logging.info(
+        'EncodeDecodeIntra yuv conversion is %s',
+        'on' if convert_to_yuv else 'off',
+    )
 
     # Workaround thread-unsafe PIL library by calling init in main thread.
     Image.init()
 
   def _positive_qstep(self):
-    return tf.keras.activations.elu(self.qstep, alpha=.01) + self.min_qstep
+    return tf.keras.activations.elu(self.qstep, alpha=0.01) + self.min_qstep
 
   def get_qstep(self) -> tf.Tensor:
     return self._positive_qstep()
@@ -192,7 +284,7 @@ class EncodeDecodeIntra(tf.keras.Model):
         luma_quantization_table=quantization_table,
         chroma_quantization_table=quantization_table,
         convert_to_yuv=convert_to_yuv,
-        clip_to_0_255=self.clip_to_0_255,
+        clip_to_image_max=self.clip_to_image_max,
     )
 
   def _rate_proxy_gaussian(self, inputs: tf.Tensor,
@@ -243,13 +335,18 @@ class EncodeDecodeIntra(tf.keras.Model):
 
     def encode_decode_inputs_with_jpeg() -> Tuple[tf.Tensor, tf.Tensor]:
       """Encodes then decodes the three_channel_inputs using actual jpeg."""
+      if self.run_jpeg_one_channel_at_a_time:
+        # 420 is a meaningless option for the jpeg binary here.
+        use_420 = tf.convert_to_tensor(False, dtype=tf.bool)
+      else:
+        use_420 = self.run_jpeg_with_downsampled_chroma
       jpeg_decoded, jpeg_rate = tf.numpy_function(
           _encode_decode_with_jpeg,
           inp=[
               three_channel_inputs,
               self._positive_qstep(),
               self.run_jpeg_one_channel_at_a_time,
-              self.downsample_chroma,
+              use_420,
           ],
           Tout=[tf.float32, tf.float32],
       )
@@ -286,13 +383,18 @@ class EncodeDecodeIntra(tf.keras.Model):
 
     return tf.math.multiply(num_nonzero_dct_coeffs, line_weights)
 
-  def _encode_decode_jpeg(self,
-                          inputs: tf.Tensor) -> Tuple[tf.Tensor, tf.Tensor]:
+  def is_codec_proxy_420(self) -> tf.Tensor:
+    return self.run_jpeg_with_downsampled_chroma
+
+  def _encode_decode_jpeg(
+      self, inputs: tf.Tensor, image_max: float
+  ) -> Tuple[tf.Tensor, tf.Tensor]:
     """Encodes then decodes the input using JPEG.
 
     Args:
       inputs: Tensor of shape [b, n, m, c] where b is batch size, n x m is the
         image size, and c is the number of channels (c <= 3).
+      image_max: Maximum possible value of the image.
 
     Returns:
       outputs: Tensor of same shape as inputs containing the
@@ -320,7 +422,8 @@ class EncodeDecodeIntra(tf.keras.Model):
 
     # JPEG quantize-dequantize.
     dequantized_three_channels, dequantized_dct_coeffs = self._jpeg_layer(
-        three_channel_inputs, self._jpeg_quantizer_fn)
+        three_channel_inputs, self._jpeg_quantizer_fn, image_max=image_max
+    )
 
     # May consider adding self._rounding_fn(dequantized_three_channels) if
     # desired.
@@ -340,7 +443,26 @@ class EncodeDecodeIntra(tf.keras.Model):
       return gauss_rate
 
     def jpeg_rate():
-      return self._rate_proxy_jpeg(three_channel_inputs, dequantized_dct_coeffs)
+      # When running the rate proxy one channel at a time with downsampled
+      # chroma (420 without color conversion case), have to explicitly
+      # downsample the chroma since the jpeg binary cannot handle this case.
+      conversion_to_420_needed = (
+          self.run_jpeg_one_channel_at_a_time
+          and self.run_jpeg_with_downsampled_chroma
+      )
+      if conversion_to_420_needed:
+        # Ensure that the input size is a multiple of 2.
+        rate_inputs = jpeg_proxy.pad_spatially_to_multiple_of_bsize(
+            three_channel_inputs, bsize=2, mode='SYMMETRIC'
+        )
+        rate_inputs = convert_444_to_420(rate_inputs)
+      else:
+        rate_inputs = three_channel_inputs
+
+      # Scale to 8-bit range so that the rate proxy can be used with any image
+      # max.
+      scale = 255.0 / image_max
+      return self._rate_proxy_jpeg(scale * rate_inputs, dequantized_dct_coeffs)
 
     rate = tf.cond(self.use_jpeg_rate_model, jpeg_rate, gaussian_rate)
 
@@ -349,13 +471,16 @@ class EncodeDecodeIntra(tf.keras.Model):
   def __call__(
       self,
       inputs: tf.Tensor,
-      input_qstep: Optional[tf.Tensor] = None) -> Tuple[tf.Tensor, tf.Tensor]:
+      input_qstep: Optional[tf.Tensor] = None,
+      image_max: float = 255.0,
+  ) -> Tuple[tf.Tensor, tf.Tensor]:
     """Encodes then decodes the input.
 
     Args:
       inputs: Tensor of shape [b, n, m, c] where b is batch size, n x m is the
         image size, and c is the number of channels.
       input_qstep: qstep to use when self.qstep is not trained.
+      image_max: Maximum possible value of the image.
 
     Returns:
       outputs: Tensor of same size as inputs containing the
@@ -371,7 +496,7 @@ class EncodeDecodeIntra(tf.keras.Model):
 
     def run_jpeg():
       if inputs.shape[-1] <= 3:
-        return self._encode_decode_jpeg(inputs)
+        return self._encode_decode_jpeg(inputs, image_max)
 
       # JPEG layer handles at most three channels. Run three channels at a time.
       # (i) Run first three channels to initialize the return tensors.
@@ -380,14 +505,16 @@ class EncodeDecodeIntra(tf.keras.Model):
       size[-1] = 3
       begin = np.zeros_like(size, dtype=np.int32)
       dequantized, rate = self._encode_decode_jpeg(
-          tf.slice(inputs, begin, size))
+          tf.slice(inputs, begin, size), image_max
+      )
 
       # (ii) Run three channels at a time and update.
       for _ in range(3, limit, 3):
         begin[-1] += 3
         size[-1] = np.minimum(limit - begin[-1], 3)
         dequantized_loop, rate_loop = self._encode_decode_jpeg(
-            tf.slice(inputs, begin, size))
+            tf.slice(inputs, begin, size), image_max
+        )
 
         # Update the return variables
         dequantized = tf.concat([dequantized, dequantized_loop], axis=3)

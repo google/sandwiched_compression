@@ -37,7 +37,7 @@ The full sandwich image and video compression models are included in this releas
 * utilities/serialization.py: Checkpoint management routines.
 * compress_intra_model.py: Sandwich model for image compression.
 * compress_video_model.py: Sandwich model for video compression.
-* datasets.py: Basic loader for tensorflow datasets.
+* datasets.py: Basic loaders for tensorflow datasets.
 * image_codec_proxy.ipynb: Colab for basic image codec proxy usage.
 * sandwich_image_compression_grayscale_codec.ipynb: Colab for the grayscale codec scenario with example training and results.
 * sandwich_image_compression_lowres_codec.ipynb: Colab for the lowres codec scenario with example training and results.

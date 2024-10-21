@@ -27,7 +27,7 @@ The code uses a differentiable codec proxy for the standard codec. Pre and post-
 In image/video compression scenarios a nice property of this work is that the networks need to generate images/video, i.e., visual data, which the standard codecs transport. We can hence check the generated images/video (termed bottlenecks) to get an idea of what the networks are trying to accomplish.
 
 ## Release
-The full sandwich image compression model is included in this release. (Video compression model is coming soon.)
+The full sandwich image and video compression models are included in this release. (Colabs for video compression coming soon.)
 
 ## Manifest
 * distortion/distortion_fns.py: Distortion functions to use in distortion-rate optimization.
@@ -36,6 +36,7 @@ The full sandwich image compression model is included in this release. (Video co
 * pre_post_models/unet.py: Simple unet model for pre-post-processors.
 * utilities/serialization.py: Checkpoint management routines.
 * compress_intra_model.py: Sandwich model for image compression.
+* compress_video_model.py: Sandwich model for video compression.
 * datasets.py: Basic loader for tensorflow datasets.
 * image_codec_proxy.ipynb: Colab for basic image codec proxy usage.
 * sandwich_image_compression_grayscale_codec.ipynb: Colab for the grayscale codec scenario with example training and results.

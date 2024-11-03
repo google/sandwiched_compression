@@ -156,9 +156,9 @@ def load_dataset(
   """Loads the tensors corresponding to dataset_keys into a tf.data.Dataset.
 
   Args:
-    sstable_path: Path to the sstable.
+    path: Path to the dataset.
     batch_size: Batch size.
-    dataset_keys_and_types: {key: type} dictionary for the requested sstable
+    dataset_keys_and_types: {key: type} dictionary for the requested dataset
       features. (Type is needed for tf.io.parse_tensor.)
     is_training: True to construct the train set, False to construct eval.
 
@@ -184,7 +184,7 @@ def load_video_dataset(
   """Loads a dataset of image and non-image keys.
 
   Args:
-    sstable_path: Path to the sstable.
+    path: Path to the dataset.
     batch_size: Batch size.
     is_training: True to construct the train set, False to construct eval.
 

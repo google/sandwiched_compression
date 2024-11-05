@@ -367,8 +367,8 @@ class PreprocessCompressPostprocessInter(tf.keras.Model):
 
     # Adjust mean/scale to improve training. Adjustment are made at the input of
     # networks and inverted at the output.
-    self.mean_adjust = 128
-    self.scale_adjust = 255
+    self.mean_adjust = tf.constant(128, dtype=tf.float32)
+    self.scale_adjust = tf.constant(255, dtype=tf.float32)
 
   def _dict_to_model_inputs(self, input_dict: Dict[str, tf.Tensor],
                             model_keys: Tuple[str, ...]) -> tf.Tensor:
@@ -469,11 +469,19 @@ class PreprocessCompressPostprocessInter(tf.keras.Model):
 
   def run_preprocessor(self, inputs: tf.Tensor, training: bool) -> tf.Tensor:
     """Runs the preprocessor and generates the bottleneck."""
-    adjusted_inputs = (inputs - self.mean_adjust) / self.scale_adjust
+    tf.debugging.assert_rank(inputs, 4)
+    adjusted_inputs = tf.math.divide(
+        inputs - self.mean_adjust, self.scale_adjust
+    )
     scale = self._unet_preprocessor_switch * self._unet_preprocessor_scaler
-    output = self.scale_adjust * (
-        self._mlp_preprocessor(adjusted_inputs, training) + scale *
-        self._unet_preprocessor(adjusted_inputs, training)) + self.mean_adjust
+    output = (
+        tf.math.multiply(
+            self.scale_adjust,
+            self._mlp_preprocessor(adjusted_inputs, training)
+            + scale * self._unet_preprocessor(adjusted_inputs, training),
+        )
+        + self.mean_adjust
+    )
     if self.downsample_factor > 1:
       output = compress_intra_model.downsample_tensor(
           output,
@@ -494,11 +502,19 @@ class PreprocessCompressPostprocessInter(tf.keras.Model):
           self.downsample_factor,
           method=tf.image.ResizeMethod.LANCZOS3,
       )
-    adjusted_inputs = (inputs - self.mean_adjust) / self.scale_adjust
+    tf.debugging.assert_rank(inputs, 4)
+    adjusted_inputs = tf.math.divide(
+        inputs - self.mean_adjust, self.scale_adjust
+    )
     scale = self._unet_postprocessor_switch * self._unet_postprocessor_scaler
-    return self.scale_adjust * (
-        self._mlp_postprocessor(adjusted_inputs, training) + scale *
-        self._unet_postprocessor(adjusted_inputs, training)) + self.mean_adjust
+    return (
+        tf.math.multiply(
+            self.scale_adjust,
+            self._mlp_postprocessor(adjusted_inputs, training)
+            + scale * self._unet_postprocessor(adjusted_inputs, training),
+        )
+        + self.mean_adjust
+    )
 
   def apply_loop_filter(self, compressed_bottleneck: tf.Tensor) -> tf.Tensor:
     """Runs the loop-filtering proxy on the compressed bottleneck."""
@@ -512,11 +528,17 @@ class PreprocessCompressPostprocessInter(tf.keras.Model):
 
     return compressed_bottleneck + filtered
 
-  def set_bit_depth(self, bit_depth: int):
+  def set_bit_depth(self, bit_depth: tf.Tensor):
     """Sets the bit depth of the input/output video."""
-    assert bit_depth > 0 and bit_depth <= 12
-    self.scale_adjust = 2**bit_depth - 1.0
-    self.mean_adjust = round(self.scale_adjust / 2)
+    # Tensors throughout to allow for different bit depths in a batch of clips.
+    tf.debugging.assert_greater(tf.math.reduce_min(bit_depth), 0.0)
+    tf.debugging.assert_less_equal(tf.math.reduce_max(bit_depth), 12.0)
+
+    # Reshape to rank-4 so that broadcasting works when needed.
+    self.scale_adjust = tf.reshape(
+        tf.math.pow(2.0, bit_depth) - 1.0, [bit_depth.shape[0], 1, 1, 1]
+    )
+    self.mean_adjust = tf.math.round(self.scale_adjust / 2)
 
   def get_warp(self, flow: tf.Tensor) -> tf.Tensor:
     warp = _flow_to_warp(flow)
@@ -548,7 +570,7 @@ class PreprocessCompressPostprocessInter(tf.keras.Model):
         tensors remain 444.
     """
     inputs = self._dict_to_model_inputs(input_dict, model_keys=self.model_keys)
-    self.set_bit_depth(input_dict.get('bit_depth', 8))
+    self.set_bit_depth(tf.cast(input_dict.get('bit_depth', [8]), tf.float32))
 
     # Convert 420 inputs to 444.
     if self.video_is_420:

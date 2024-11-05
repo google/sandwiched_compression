@@ -388,7 +388,7 @@ class EncodeDecodeIntra(tf.keras.Model):
     return self.run_jpeg_with_downsampled_chroma
 
   def _encode_decode_jpeg(
-      self, inputs: tf.Tensor, image_max: float
+      self, inputs: tf.Tensor, image_max: tf.Tensor
   ) -> Tuple[tf.Tensor, tf.Tensor]:
     """Encodes then decodes the input using JPEG.
 
@@ -462,8 +462,9 @@ class EncodeDecodeIntra(tf.keras.Model):
 
       # Scale to 8-bit range so that the rate proxy can be used with any image
       # max.
-      scale = 255.0 / image_max
-      return self._rate_proxy_jpeg(scale * rate_inputs, dequantized_dct_coeffs)
+      scale = tf.math.divide(255.0, image_max)
+      rate_inputs = tf.math.multiply(scale, rate_inputs)
+      return self._rate_proxy_jpeg(rate_inputs, dequantized_dct_coeffs)
 
     rate = tf.cond(self.use_jpeg_rate_model, jpeg_rate, gaussian_rate)
 
@@ -473,7 +474,7 @@ class EncodeDecodeIntra(tf.keras.Model):
       self,
       inputs: tf.Tensor,
       input_qstep: Optional[tf.Tensor] = None,
-      image_max: float = 255.0,
+      image_max: Optional[tf.Tensor] = None,
   ) -> Tuple[tf.Tensor, tf.Tensor]:
     """Encodes then decodes the input.
 
@@ -494,6 +495,9 @@ class EncodeDecodeIntra(tf.keras.Model):
 
     if not self.train_qstep and input_qstep is not None:
       self.qstep = input_qstep
+
+    if image_max is None:
+      image_max = tf.constant(255.0, dtype=tf.float32)
 
     def run_jpeg():
       if inputs.shape[-1] <= 3:

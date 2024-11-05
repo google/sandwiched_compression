@@ -13,7 +13,7 @@
 # limitations under the License.
 r"""Jpeg proxy that emulates intra compression with jpeg."""
 import itertools
-from typing import Callable, Dict, Tuple
+from typing import Callable, Dict, Optional, Tuple
 
 import numpy as np
 import tensorflow as tf
@@ -201,7 +201,7 @@ class JpegProxy:
       self,
       image: tf.Tensor,
       rounding_fn: Callable[[tf.Tensor], tf.Tensor] = tf.round,
-      image_max: float = 255.0,
+      image_max: Optional[tf.Tensor] = None,
   ) -> Tuple[tf.Tensor, Dict[str, tf.Tensor]]:
     """Compresses and decompresses input an image similar to JPEG.
 
@@ -229,6 +229,8 @@ class JpegProxy:
     image.shape.assert_has_rank(4)
     assert image.shape[-1] == 3
     height, width = image.shape[1:3]
+    if image_max is None:
+      image_max = tf.constant(255.0, dtype=tf.float32)
 
     # Pad to a multiple of dct_size (or 2 * dct_size if downsampling chroma.)
     pad_multiple = (

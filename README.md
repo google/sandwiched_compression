@@ -41,8 +41,9 @@ The full sandwich image and video compression models are included in this releas
 * image_codec_proxy.ipynb: Colab for basic image codec proxy usage.
 * sandwich_image_compression_grayscale_codec.ipynb: Colab for the grayscale codec scenario with example training and results.
 * sandwich_image_compression_lowres_codec.ipynb: Colab for the lowres codec scenario with example training and results.
+* sandwich_video_compression_grayscale_codec.ipynb: Colab for the grayscale codec scenario with example training and results.
 
-## Usage
+## Usage for Image Compression
 Please see sandwich_image_compression_lowres_codec.ipynb and sandwich_image_compression_grayscale_codec.ipynb for two scenarios discussed in the paper. The third colab shows the usage of the image codec proxy which you can try in your own sandwich implementations. 
 
 [Sandwich Image Compression Lowres Codec](https://colab.research.google.com/github/google/sandwiched_compression/blob/main/sandwich_image_compression_lowres_codec.ipynb)
@@ -52,6 +53,15 @@ Please see sandwich_image_compression_lowres_codec.ipynb and sandwich_image_comp
 [Sandwich Image Compression Image Codec Proxy](https://colab.research.google.com/github/google/sandwiched_compression/blob/main/image_codec_proxy.ipynb)
 
 The links above will open/run the colabs in the community server. That may be too slow for realistic training. Please consider using your own colab setups. For the latter, beyond the included software you will need tensorflow-datasets (with the 'clic' dataset downloaded) and mediapy. Your tensorflow installation may already have tensorflow-datasets. In that case 'clic' should automatically download as you run the colabs the first time. Please see the colabs for needed installations and links.
+
+## Usage for Video Compression
+Please see sandwich_video_compression_lowres_codec.ipynb and sandwich_video_compression_grayscale_codec.ipynb for two scenarios discussed in the paper. You will need to download the example dataset. This is a limited dataset compiled from legacy video sequences for standards-based compression. Please consider extending it significantly for training production models. 
+
+Download Instructions: Coming soon.
+
+[Sandwich Video Compression Lowres Codec](coming soon)
+
+[Sandwich Video Compression Grayscale Codec](https://colab.research.google.com/github/google/sandwiched_compression/blob/main/sandwich_video_compression_grayscale_codec.ipynb)
 
 ## References
 [Image and Video Compression](https://arxiv.org/abs/2402.05887)

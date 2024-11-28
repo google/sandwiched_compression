@@ -46,11 +46,11 @@ The full sandwich image and video compression models are included in this releas
 ## Usage for Image Compression
 Please see sandwich_image_compression_lowres_codec.ipynb and sandwich_image_compression_grayscale_codec.ipynb for two of the many scenarios discussed in the paper. The third colab shows the usage of the image codec proxy which you can try in your own sandwich implementations. 
 
-[Sandwich Image Compression Lowres Codec](https://colab.research.google.com/github/google/sandwiched_compression/blob/main/sandwich_image_compression_lowres_codec.ipynb)
+[Colab: Sandwich Image Compression Lowres Codec](https://colab.research.google.com/github/google/sandwiched_compression/blob/main/sandwich_image_compression_lowres_codec.ipynb)
 
-[Sandwich Image Compression Grayscale Codec](https://colab.research.google.com/github/google/sandwiched_compression/blob/main/sandwich_image_compression_grayscale_codec.ipynb)
+[Colab: Sandwich Image Compression Grayscale Codec](https://colab.research.google.com/github/google/sandwiched_compression/blob/main/sandwich_image_compression_grayscale_codec.ipynb)
 
-[Sandwich Image Compression Image Codec Proxy](https://colab.research.google.com/github/google/sandwiched_compression/blob/main/image_codec_proxy.ipynb)
+[Colab: Sandwich Image Compression Image Codec Proxy](https://colab.research.google.com/github/google/sandwiched_compression/blob/main/image_codec_proxy.ipynb)
 
 The links above will open/run the colabs in the community server. That may be too slow for realistic training. Please consider using your own colab setups. For the latter, beyond the included software you will need tensorflow-datasets (with the 'clic' dataset downloaded) and mediapy. Your tensorflow installation may already have tensorflow-datasets. In that case 'clic' should automatically download as you run the colabs the first time. Please see the colabs for needed installations and links.
 
@@ -59,9 +59,9 @@ Please see sandwich_video_compression_lowres_codec.ipynb and sandwich_video_comp
 
 Download Instructions: Coming soon.
 
-[Sandwich Video Compression Lowres Codec](https://colab.research.google.com/github/google/sandwiched_compression/blob/main/sandwich_video_compression_lowres_codec.ipynb)
+[Colab: Sandwich Video Compression Lowres Codec](https://colab.research.google.com/github/google/sandwiched_compression/blob/main/sandwich_video_compression_lowres_codec.ipynb)
 
-[Sandwich Video Compression Grayscale Codec](https://colab.research.google.com/github/google/sandwiched_compression/blob/main/sandwich_video_compression_grayscale_codec.ipynb)
+[Colab: Sandwich Video Compression Grayscale Codec](https://colab.research.google.com/github/google/sandwiched_compression/blob/main/sandwich_video_compression_grayscale_codec.ipynb)
 
 ## References
 [Image and Video Compression](https://arxiv.org/abs/2402.05887)

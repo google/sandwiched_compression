@@ -57,11 +57,31 @@ The links above will open/run the colabs in the community server. That may be to
 ## Usage for Video Compression
 Please see sandwich_video_compression_lowres_codec.ipynb and sandwich_video_compression_grayscale_codec.ipynb for two of the many scenarios discussed in the paper. You will need to download the example dataset. This is a limited dataset compiled from legacy video sequences for standards-based compression. Please consider extending it significantly for training production models. 
 
-Download Instructions: Coming soon.
+[Example Video Dataset](https://www.kaggle.com/datasets/onurgguleryuz/sandwich-video-research-yuv444)
 
 [Colab: Sandwich Video Compression Lowres Codec](https://colab.research.google.com/github/google/sandwiched_compression/blob/main/sandwich_video_compression_lowres_codec.ipynb)
 
 [Colab: Sandwich Video Compression Grayscale Codec](https://colab.research.google.com/github/google/sandwiched_compression/blob/main/sandwich_video_compression_grayscale_codec.ipynb)
+
+## Usage for Example Video Dataset
+```python
+dataset_path = '<path to downloaded dataset>/*'
+def dataset_fn(
+    batch_size: int, is_training: bool, take_count: int = 100
+) -> tf.data.Dataset:
+  return datasets.load_video_dataset(
+      path=dataset_path,
+      batch_size=batch_size,
+      is_training=is_training,
+  ).take(take_count)
+
+# Samples are in Dict[str, tf.Tensor] format. Please see datasets._video_data for keys.
+# Please see video colabs for use with the sandwich models.
+train_batch_size = 3
+train_dataset = dataset_fn(train_batch_size, True)  # Pull from train split.
+eval_batch_size = 1
+eval_dataset = dataset_fn(eval_batch_size, False)  # Pull from eval split.
+```
 
 ## References
 [Image and Video Compression](https://arxiv.org/abs/2402.05887)

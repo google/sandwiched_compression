@@ -384,8 +384,8 @@ class PreprocessCompressPostprocess(tf.keras.Model):
     adjusted_inputs = (inputs - self.mean_adjust) / self.scale_adjust
     scale = self._unet_preprocessor_switch * self._unet_preprocessor_scaler
     output = self.scale_adjust * (
-        self._mlp_preprocessor(adjusted_inputs, training) + scale *
-        self._unet_preprocessor(adjusted_inputs, training)) + self.mean_adjust
+        self._mlp_preprocessor(adjusted_inputs, training=training) + scale *
+        self._unet_preprocessor(adjusted_inputs, training=training)) + self.mean_adjust
 
     if self.downsample_factor > 1:
       output = downsample_tensor(
@@ -418,8 +418,8 @@ class PreprocessCompressPostprocess(tf.keras.Model):
                        self.mean_adjust) / self.scale_adjust
     scale = self._unet_postprocessor_switch * self._unet_postprocessor_scaler
     return self.scale_adjust * (
-        self._mlp_postprocessor(adjusted_inputs, training) + scale *
-        self._unet_postprocessor(adjusted_inputs, training)) + self.mean_adjust
+        self._mlp_postprocessor(adjusted_inputs, training=training) + scale *
+        self._unet_postprocessor(adjusted_inputs, training=training)) + self.mean_adjust
 
   def apply_loop_filter(self, compressed_bottleneck: tf.Tensor) -> tf.Tensor:
     """Runs the loop-filter proxy on the compressed bottleneck."""

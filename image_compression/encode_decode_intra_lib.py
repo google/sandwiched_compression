@@ -447,9 +447,9 @@ class EncodeDecodeIntra(tf.keras.Model):
       # When running the rate proxy one channel at a time with downsampled
       # chroma (420 without color conversion case), have to explicitly
       # downsample the chroma since the jpeg binary cannot handle this case.
-      conversion_to_420_needed = (
-          self.run_jpeg_one_channel_at_a_time
-          and self.run_jpeg_with_downsampled_chroma
+      conversion_to_420_needed = tf.math.logical_and(
+          self.run_jpeg_one_channel_at_a_time,
+          self.run_jpeg_with_downsampled_chroma
       )
       if conversion_to_420_needed:
         # Ensure that the input size is a multiple of 2.

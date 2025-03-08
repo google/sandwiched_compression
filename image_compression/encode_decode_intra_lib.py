@@ -336,11 +336,12 @@ class EncodeDecodeIntra(tf.keras.Model):
 
     def encode_decode_inputs_with_jpeg() -> Tuple[tf.Tensor, tf.Tensor]:
       """Encodes then decodes the three_channel_inputs using actual jpeg."""
-      if self.run_jpeg_one_channel_at_a_time:
-        # 420 is a meaningless option for the jpeg binary here.
-        use_420 = tf.convert_to_tensor(False, dtype=tf.bool)
-      else:
-        use_420 = self.run_jpeg_with_downsampled_chroma
+      use_420 = tf.cond(
+          self.run_jpeg_one_channel_at_a_time,
+          # 420 is a meaningless option for the jpeg binary here.
+          lambda: tf.convert_to_tensor(False, dtype=tf.bool),
+          lambda: self.run_jpeg_with_downsampled_chroma
+      )
       jpeg_decoded, jpeg_rate = tf.numpy_function(
           _encode_decode_with_jpeg,
           inp=[

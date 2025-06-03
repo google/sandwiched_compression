@@ -27,7 +27,7 @@ The code uses a differentiable codec proxy for the standard codec. Pre and post-
 In image/video compression scenarios a nice property of this work is that the networks need to generate images/video, i.e., visual data, which the standard codecs transport. We can hence check the generated images/video (termed bottlenecks) to get an idea of what the networks are trying to accomplish.
 
 ## Release
-The full sandwich image and video compression models are included in this release. (Colabs for video compression coming soon.)
+The full sandwich image and video compression models are included in this release.
 
 ## Manifest
 * distortion/distortion_fns.py: Distortion functions to use in distortion-rate optimization.
